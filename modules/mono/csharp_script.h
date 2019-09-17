@@ -117,6 +117,10 @@ private:
 	String source;
 	StringName name;
 
+	// For engine "Script Class" support, not affiliated with `GDMonoClass *script_class` property.
+	String script_class_name;
+	String script_class_icon_path;
+
 	SelfList<CSharpScript> script_list = this;
 
 	Map<StringName, Vector<SignalParameter>> _signals;
@@ -230,6 +234,10 @@ public:
 #endif
 
 	Error load_source_code(const String &p_path);
+
+	StringName get_script_name() const;
+	String get_script_class_name() const { return script_class_name; }
+	String get_script_class_icon_path() const { return script_class_icon_path; }
 
 	CSharpScript();
 	~CSharpScript();
@@ -475,6 +483,10 @@ public:
 	virtual String _get_indentation() const;
 	/* TODO? */ void auto_indent_code(String &p_code, int p_from_line, int p_to_line) const override {}
 	/* TODO */ void add_global_constant(const StringName &p_variable, const Variant &p_value) override {}
+
+	/* SCRIPT CLASS FUNCTIONS */
+	virtual bool handles_global_class_type(const String &p_type) const;
+	virtual String get_global_class_name(const String &p_path, String *r_base_type = NULL, String *r_icon_path = NULL) const;
 
 	/* DEBUGGER FUNCTIONS */
 	String debug_get_error() const override;

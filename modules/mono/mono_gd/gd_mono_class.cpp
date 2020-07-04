@@ -129,6 +129,9 @@ Vector<MonoClassField *> GDMonoClass::get_enum_fields() {
 #endif
 
 bool GDMonoClass::has_attribute(GDMonoClass *p_attr_class) {
+	if (!p_attr_class) {
+		print_line("doesn't exist");
+	}
 #ifdef DEBUG_ENABLED
 	ERR_FAIL_NULL_V(p_attr_class, false);
 #endif

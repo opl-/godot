@@ -265,6 +265,9 @@ void update_godot_api_cache() {
 	CACHE_CLASS_AND_CHECK(ExportAttribute, GODOT_API_CLASS(ExportAttribute));
 	CACHE_FIELD_AND_CHECK(ExportAttribute, hint, CACHED_CLASS(ExportAttribute)->get_field("hint"));
 	CACHE_FIELD_AND_CHECK(ExportAttribute, hintString, CACHED_CLASS(ExportAttribute)->get_field("hintString"));
+	CACHE_CLASS_AND_CHECK(ScriptClassAttribute, GODOT_API_CLASS(ScriptClassAttribute));
+	CACHE_FIELD_AND_CHECK(ScriptClassAttribute, name, CACHED_CLASS(ScriptClassAttribute)->get_field("name"));
+	CACHE_FIELD_AND_CHECK(ScriptClassAttribute, iconPath, CACHED_CLASS(ScriptClassAttribute)->get_field("iconPath"));
 	CACHE_CLASS_AND_CHECK(SignalAttribute, GODOT_API_CLASS(SignalAttribute));
 	CACHE_CLASS_AND_CHECK(ToolAttribute, GODOT_API_CLASS(ToolAttribute));
 	CACHE_CLASS_AND_CHECK(RemoteAttribute, GODOT_API_CLASS(RemoteAttribute));

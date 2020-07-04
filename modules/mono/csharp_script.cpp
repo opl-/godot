@@ -3035,6 +3035,9 @@ void CSharpScript::initialize_for_managed_type(Ref<CSharpScript> p_script, GDMon
 	}
 #endif
 
+	print_line("initialize_for_managed_type");
+	print_line(String(Variant(p_script->script_class->has_attribute(CACHED_CLASS(ScriptClassAttribute)))));
+
 	// Evaluate script's use of engine "Script Class" system.
 	if (p_script->script_class->has_attribute(CACHED_CLASS(ScriptClassAttribute))) {
 		MonoObject *attr = p_script->script_class->get_attribute(CACHED_CLASS(ScriptClassAttribute));

@@ -724,6 +724,8 @@ void EditorFileSystem::_scan_new_dir(EditorFileSystemDirectory *p_dir, DirAccess
 		FileCache *fc = file_cache.getptr(path);
 		uint64_t mt = FileAccess::get_modified_time(path);
 
+		print_line("editor_file_system::_scan_new_dir: fi->file=" + fi->file + ", ext=" + ext + ", !!fc=" + String(Variant(!!fc)));
+
 		if (import_extensions.has(ext)) {
 			//is imported
 			uint64_t import_mt = 0;
@@ -1355,6 +1357,7 @@ void EditorFileSystem::_scan_script_classes(EditorFileSystemDirectory *p_dir) {
 	int filecount = p_dir->files.size();
 	const EditorFileSystemDirectory::FileInfo *const *files = p_dir->files.ptr();
 	for (int i = 0; i < filecount; i++) {
+		print_line(files[i]->file + ": script_class_name=" + files[i]->script_class_name + ", script_class_extends=" + files[i]->script_class_extends + ", type=" + files[i]->type);
 		if (files[i]->script_class_name == String()) {
 			continue;
 		}
@@ -1363,6 +1366,7 @@ void EditorFileSystem::_scan_script_classes(EditorFileSystemDirectory *p_dir) {
 		for (int j = 0; j < ScriptServer::get_language_count(); j++) {
 			if (ScriptServer::get_language(j)->handles_global_class_type(files[i]->type)) {
 				lang = ScriptServer::get_language(j)->get_name();
+				break;
 			}
 		}
 		ScriptServer::add_global_class(files[i]->script_class_name, files[i]->script_class_extends, lang, p_dir->get_file_path(i));

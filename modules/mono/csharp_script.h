@@ -119,6 +119,7 @@ private:
 
 	// For engine "Script Class" support, not affiliated with `GDMonoClass *script_class` property.
 	String script_class_name;
+	String script_base_class_name;
 	String script_class_icon_path;
 
 	SelfList<CSharpScript> script_list = this;
@@ -237,6 +238,7 @@ public:
 
 	StringName get_script_name() const;
 	String get_script_class_name() const { return script_class_name; }
+	String get_script_base_class_name() const { return script_base_class_name; }
 	String get_script_class_icon_path() const { return script_class_icon_path; }
 
 	CSharpScript();

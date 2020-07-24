@@ -544,7 +544,7 @@ String CSharpLanguage::get_global_class_name(const String &p_path, String *r_bas
 		String name = script->get_script_class_name();
 		if (name.length()) {
 			if (r_base_type)
-				*r_base_type = "";
+				*r_base_type = script->get_script_base_class_name();
 			if (r_icon_path)
 				*r_icon_path = script->get_script_class_icon_path();
 			return name;
@@ -2429,6 +2429,7 @@ void CSharpScript::_update_member_info_no_exports() {
 #endif
 
 bool CSharpScript::_update_exports() {
+	print_line("CSharpScript::_update_exports: script_name=" + script_class_name + ", exports_invalidated=" + String(Variant(exports_invalidated)));
 #ifdef TOOLS_ENABLED
 	bool is_editor = Engine::get_singleton()->is_editor_hint();
 	if (is_editor) {
@@ -2438,6 +2439,7 @@ bool CSharpScript::_update_exports() {
 	if (!valid) {
 		return false;
 	}
+	print_line("  continuing...");
 
 	bool changed = false;
 
@@ -2810,6 +2812,16 @@ bool CSharpScript::_get_member_export(IMonoClassMember *p_member, bool p_inspect
 	if (hint_res == 0) {
 		hint = PropertyHint(CACHED_FIELD(ExportAttribute, hint)->get_int_value(attr));
 		hint_string = CACHED_FIELD(ExportAttribute, hintString)->get_string_value(attr);
+	} else if (hint_res == 2) {
+		String user_string_hint = CACHED_FIELD(ExportAttribute, hintString)->get_string_value(attr);
+
+		// FIXME: this blindly trusts the user, meaning the user might end up in a scenario where no resource types are offered in the property editor
+		if (!user_string_hint.empty()) {
+			hint_string = user_string_hint;
+		} else {
+			// FIXME: this blindly assumes that the ScriptClassAttribute name isn't different (can it even be different?)
+			hint_string = type.type_class->get_name();
+		}
 	}
 #endif
 
@@ -2890,11 +2902,15 @@ int CSharpScript::_try_get_member_export_hint(IMonoClassMember *p_member, Manage
 			r_hint_string = name_only_hint_string;
 		}
 	} else if (p_variant_type == Variant::OBJECT && CACHED_CLASS(GodotResource)->is_assignable_from(p_type.type_class)) {
+		// TODO: when we have a CSharpScript cache, allow checking if the class p_type inherits from is a global class (ie has ScriptClassAttribute), and expose that as the hint_string instead
+		// TODO: if hint_string is set on the attribute and uses a more specific class (lower in the inheritance tree) than the member type, use the hint instead. should also support non-c# global scripts
 		GDMonoClass *field_native_class = GDMonoUtils::get_class_native_base(p_type.type_class);
 		CRASH_COND(field_native_class == nullptr);
 
 		r_hint = PROPERTY_HINT_RESOURCE_TYPE;
 		r_hint_string = String(NATIVE_GDMONOCLASS_NAME(field_native_class));
+
+		return 2; // indicate to the caller that they should possibly use the hint_string instead
 	} else if (p_allow_generics && p_variant_type == Variant::ARRAY) {
 		// Nested arrays are not supported in the inspector
 
@@ -2999,6 +3015,7 @@ Ref<CSharpScript> CSharpScript::create_for_managed_type(GDMonoClass *p_class, GD
 	// TODO OPTIMIZE: Cache the 'CSharpScript' associated with this 'p_class' instead of allocating a new one every time
 	Ref<CSharpScript> script = memnew(CSharpScript);
 
+	// TODO: replace this with a call to script->reload()?
 	initialize_for_managed_type(script, p_class, p_native);
 
 	return script;
@@ -3041,11 +3058,22 @@ void CSharpScript::initialize_for_managed_type(Ref<CSharpScript> p_script, GDMon
 	// Evaluate script's use of engine "Script Class" system.
 	if (p_script->script_class->has_attribute(CACHED_CLASS(ScriptClassAttribute))) {
 		MonoObject *attr = p_script->script_class->get_attribute(CACHED_CLASS(ScriptClassAttribute));
-		String script_class_name = CACHED_FIELD(ScriptClassAttribute, name)->get_string_value(attr);
-		String script_class_icon_path = CACHED_FIELD(ScriptClassAttribute, iconPath)->get_string_value(attr);
-		if (script_class_name.empty()) {
-			script_class_name = p_script->script_class->get_name();
+		p_script->script_class_name = CACHED_FIELD(ScriptClassAttribute, name)->get_string_value(attr);
+		p_script->script_class_icon_path = CACHED_FIELD(ScriptClassAttribute, iconPath)->get_string_value(attr);
+
+		if (p_script->script_class_name.empty()) {
+			p_script->script_class_name = p_script->script_class->get_name();
 		}
+
+		// FIXME: this doesn't check that the base type is registered as a global class, which could lead to issues
+		if (p_script->base) {
+			p_script->script_base_class_name = p_script->base->get_name();
+		} else if (p_script->native) {
+			p_script->script_base_class_name = p_script->native->get_name();
+		}
+
+		// XXX: this gets called correctly, but only when the class is used on a scene node
+		print_line("init " + p_script->script_class_name + " " + p_script->script_class_icon_path);
 	}
 
 #ifdef DEBUG_ENABLED
@@ -3341,6 +3369,7 @@ MethodInfo CSharpScript::get_method_info(const StringName &p_method) const {
 	return MethodInfo();
 }
 
+// FIXME: a bunch of stuff from here is a repeat from initialize_for_managed_type
 Error CSharpScript::reload(bool p_keep_state) {
 	bool has_instances;
 	{
@@ -3399,6 +3428,25 @@ Error CSharpScript::reload(bool p_keep_state) {
 
 			if (base_class != native) {
 				base = base_class;
+			}
+
+			if (script_class->has_attribute(CACHED_CLASS(ScriptClassAttribute))) {
+				MonoObject *attr = script_class->get_attribute(CACHED_CLASS(ScriptClassAttribute));
+				script_class_name = CACHED_FIELD(ScriptClassAttribute, name)->get_string_value(attr);
+				script_class_icon_path = CACHED_FIELD(ScriptClassAttribute, iconPath)->get_string_value(attr);
+
+				if (script_class_name.empty()) {
+					script_class_name = script_class->get_name();
+				}
+
+				if (base) {
+					// FIXME: this doesn't check that the base type is registered as a global class, which could lead to issues
+					script_base_class_name = base->get_name();
+				} else if (native) {
+					script_base_class_name = native->get_name();
+				}
+
+				print_line("reload " + script_class_name + " " + script_class_icon_path);
 			}
 
 #ifdef DEBUG_ENABLED
@@ -3593,6 +3641,7 @@ bool CSharpScript::inherits_script(const Ref<Script> &p_script) const {
 
 Ref<Script> CSharpScript::get_base_script() const {
 	// TODO search in metadata file once we have it, not important any way?
+	// FIXME: yes important for editor node inheritance(?)
 	return Ref<Script>();
 }
 
@@ -3756,6 +3805,7 @@ RES ResourceFormatLoaderCSharpScript::load(const String &p_path, const String &p
 
 	// TODO ignore anything inside bin/ and obj/ in tools builds?
 
+	// FIXME: either this needs to call CSharpScript::create_for_whatever or reload() needs to do the same work
 	CSharpScript *script = memnew(CSharpScript);
 
 	Ref<CSharpScript> scriptres(script);

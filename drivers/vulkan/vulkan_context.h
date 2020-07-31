@@ -89,6 +89,7 @@ class VulkanContext {
 		uint32_t current_buffer = 0;
 		int width = 0;
 		int height = 0;
+		bool swap_chain_update_queued = false;
 		VkCommandPool present_cmd_pool; //for separate present queue
 		VkRenderPass render_pass = VK_NULL_HANDLE;
 	};

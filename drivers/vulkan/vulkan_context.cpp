@@ -40,6 +40,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 #define APP_SHORT_NAME "GodotEngine"
@@ -725,7 +726,8 @@ void VulkanContext::window_resize(DisplayServer::WindowID p_window, int p_width,
 	ERR_FAIL_COND(!windows.has(p_window));
 	windows[p_window].width = p_width;
 	windows[p_window].height = p_height;
-	_update_swap_chain(&windows[p_window]);
+	windows[p_window].swap_chain_update_queued = true;
+	// _update_swap_chain(&windows[p_window]);
 }
 
 int VulkanContext::window_get_width(DisplayServer::WindowID p_window) {
@@ -786,7 +788,13 @@ Error VulkanContext::_clean_up_swap_chain(Window *window) {
 }
 
 Error VulkanContext::_update_swap_chain(Window *window) {
+	timeval tp;
+
+	gettimeofday(&tp, nullptr);
+	print_line("VulkanContext::_update_swap_chain 1: " + String(Variant(tp.tv_sec)) + "." + String(Variant(tp.tv_usec)));
 	VkResult err;
+
+	window->swap_chain_update_queued = false;
 
 	if (window->swapchain) {
 		_clean_up_swap_chain(window);
@@ -807,6 +815,8 @@ Error VulkanContext::_update_swap_chain(Window *window) {
 		free(presentModes);
 		ERR_FAIL_V(ERR_CANT_CREATE);
 	}
+	gettimeofday(&tp, nullptr);
+	print_line("VulkanContext::_update_swap_chain 2: " + String(Variant(tp.tv_sec)) + "." + String(Variant(tp.tv_usec)));
 
 	VkExtent2D swapchainExtent;
 	// width and height are either both 0xFFFFFFFF, or both not 0xFFFFFFFF.
@@ -881,6 +891,8 @@ Error VulkanContext::_update_swap_chain(Window *window) {
 	}
 	free(presentModes);
 	ERR_FAIL_COND_V_MSG(swapchainPresentMode != window->presentMode, ERR_CANT_CREATE, "Present mode specified is not supported\n");
+	gettimeofday(&tp, nullptr);
+	print_line("VulkanContext::_update_swap_chain 3: " + String(Variant(tp.tv_sec)) + "." + String(Variant(tp.tv_usec)));
 
 	// Determine the number of VkImages to use in the swap chain.
 	// Application desires to acquire 3 images at a time for triple
@@ -941,6 +953,8 @@ Error VulkanContext::_update_swap_chain(Window *window) {
 		/*clipped*/ true,
 		/*oldSwapchain*/ VK_NULL_HANDLE,
 	};
+	gettimeofday(&tp, nullptr);
+	print_line("VulkanContext::_update_swap_chain 4: " + String(Variant(tp.tv_sec)) + "." + String(Variant(tp.tv_usec)));
 
 	err = fpCreateSwapchainKHR(device, &swapchain_ci, nullptr, &window->swapchain);
 	ERR_FAIL_COND_V(err, ERR_CANT_CREATE);
@@ -963,6 +977,8 @@ Error VulkanContext::_update_swap_chain(Window *window) {
 		free(swapchainImages);
 		ERR_FAIL_V(ERR_CANT_CREATE);
 	}
+	gettimeofday(&tp, nullptr);
+	print_line("VulkanContext::_update_swap_chain 5: " + String(Variant(tp.tv_sec)) + "." + String(Variant(tp.tv_usec)));
 
 	window->swapchain_image_resources =
 			(SwapchainImageResources *)malloc(sizeof(SwapchainImageResources) * swapchainImageCount);
@@ -970,6 +986,8 @@ Error VulkanContext::_update_swap_chain(Window *window) {
 		free(swapchainImages);
 		ERR_FAIL_V(ERR_CANT_CREATE);
 	}
+	gettimeofday(&tp, nullptr);
+	print_line("VulkanContext::_update_swap_chain 6: " + String(Variant(tp.tv_sec)) + "." + String(Variant(tp.tv_usec)));
 
 	for (uint32_t i = 0; i < swapchainImageCount; i++) {
 		VkImageViewCreateInfo color_image_view = {
@@ -1002,6 +1020,8 @@ Error VulkanContext::_update_swap_chain(Window *window) {
 			ERR_FAIL_V(ERR_CANT_CREATE);
 		}
 	}
+	gettimeofday(&tp, nullptr);
+	print_line("VulkanContext::_update_swap_chain 7: " + String(Variant(tp.tv_sec)) + "." + String(Variant(tp.tv_usec)));
 
 	free(swapchainImages);
 
@@ -1070,6 +1090,8 @@ Error VulkanContext::_update_swap_chain(Window *window) {
 			ERR_FAIL_COND_V(err, ERR_CANT_CREATE);
 		}
 	}
+	gettimeofday(&tp, nullptr);
+	print_line("VulkanContext::_update_swap_chain 8: " + String(Variant(tp.tv_sec)) + "." + String(Variant(tp.tv_usec)));
 
 	/******** SEPARATE PRESENT QUEUE ************/
 
@@ -1122,6 +1144,8 @@ Error VulkanContext::_update_swap_chain(Window *window) {
 			ERR_FAIL_COND_V(err, ERR_CANT_CREATE);
 		}
 	}
+	gettimeofday(&tp, nullptr);
+	print_line("VulkanContext::_update_swap_chain 9: " + String(Variant(tp.tv_sec)) + "." + String(Variant(tp.tv_usec)));
 
 	//reset current buffer
 	window->current_buffer = 0;
@@ -1211,6 +1235,10 @@ Error VulkanContext::prepare_buffers() {
 	for (Map<int, Window>::Element *E = windows.front(); E; E = E->next()) {
 		Window *w = &E->get();
 
+		if (w->swap_chain_update_queued) {
+			_update_swap_chain(w);
+		}
+
 		if (w->swapchain == VK_NULL_HANDLE) {
 			continue;
 		}
@@ -1248,7 +1276,7 @@ Error VulkanContext::swap_buffers() {
 		return OK;
 	}
 
-	//	print_line("swapbuffers?");
+		print_line("swapbuffers?");
 	VkResult err;
 
 #if 0
@@ -1429,7 +1457,7 @@ Error VulkanContext::swap_buffers() {
 #endif
 	static int total_frames = 0;
 	total_frames++;
-	//	print_line("current buffer:  " + itos(current_buffer));
+		print_line("current buffer:  " + itos(total_frames));
 	err = fpQueuePresentKHR(present_queue, &present);
 
 	frame_index += 1;

@@ -50,6 +50,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
@@ -2265,6 +2266,11 @@ void DisplayServerX11::_xim_destroy_callback(::XIM im, ::XPointer client_data,
 void DisplayServerX11::_window_changed(XEvent *event) {
 	WindowID window_id = MAIN_WINDOW_ID;
 
+	timeval tp;
+
+	gettimeofday(&tp, nullptr);
+	print_line("DisplayServerX11::_window_changed 1: " + String(Variant(tp.tv_sec)) + "." + String(Variant(tp.tv_usec)));
+
 	// Assign the event to the relevant window
 	for (Map<WindowID, WindowData>::Element *E = windows.front(); E; E = E->next()) {
 		if (event->xany.window == E->get().x11_window) {
@@ -2302,12 +2308,16 @@ void DisplayServerX11::_window_changed(XEvent *event) {
 
 	wd.position = new_rect.position;
 	wd.size = new_rect.size;
+	gettimeofday(&tp, nullptr);
+	print_line("DisplayServerX11::_window_changed 2: " + String(Variant(tp.tv_sec)) + "." + String(Variant(tp.tv_usec)));
 
 #if defined(VULKAN_ENABLED)
 	if (rendering_driver == "vulkan") {
 		context_vulkan->window_resize(window_id, wd.size.width, wd.size.height);
 	}
 #endif
+	gettimeofday(&tp, nullptr);
+	print_line("DisplayServerX11::_window_changed 3: " + String(Variant(tp.tv_sec)) + "." + String(Variant(tp.tv_usec)));
 
 	print_line("DisplayServer::_window_changed: " + itos(window_id) + " rect: " + new_rect);
 	if (!wd.rect_changed_callback.is_null()) {
@@ -2320,6 +2330,8 @@ void DisplayServerX11::_window_changed(XEvent *event) {
 		Callable::CallError ce;
 		wd.rect_changed_callback.call((const Variant **)&rectp, 1, ret, ce);
 	}
+	gettimeofday(&tp, nullptr);
+	print_line("DisplayServerX11::_window_changed 4: " + String(Variant(tp.tv_sec)) + "." + String(Variant(tp.tv_usec)));
 }
 
 void DisplayServerX11::_dispatch_input_events(const Ref<InputEvent> &p_event) {

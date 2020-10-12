@@ -369,8 +369,12 @@ class ScriptEditor : public PanelContainer {
 	ScriptEditorBase *_get_current_editor() const;
 	Array _get_open_script_editors() const;
 
+	int last_external_editor_preset;
+
 	void _save_layout();
 	void _editor_settings_changed();
+	void _update_external_editor_preset();
+	static void _get_external_editor_preset(const int p_preset, String &r_path, String &r_flags);
 	void _filesystem_changed();
 	void _file_removed(const String &p_file);
 	void _autosave_scripts();

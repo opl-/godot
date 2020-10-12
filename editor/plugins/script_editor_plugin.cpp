@@ -2116,49 +2116,8 @@ bool ScriptEditor::edit(const RES &p_resource, int p_line, int p_col, bool p_gra
 			(EditorDebuggerNode::get_singleton()->get_dump_stack_script() != p_resource || EditorDebuggerNode::get_singleton()->get_debug_with_external_editor()) &&
 			p_resource->get_path().is_resource_file() &&
 			p_resource->get_class_name() != StringName("VisualScript")) {
-		int exec_preset = EditorSettings::get_singleton()->get("text_editor/external/exec_preset");
-		String path;
-		String flags;
-
-		switch (exec_preset) {
-			case 0: {
-				flags = EditorSettings::get_singleton()->get("text_editor/external/exec_flags");
-			} break;
-			case 1: {
-				path = "atom";
-				flags = "{file}:{line}:{col}";
-			} break;
-			case 2: {
-				path = "geany";
-				flags = "{file} --line {line} --column {col}";
-			} break;
-			case 3: {
-				path = "rider";
-				flags = "--line {line} --column {col} {file}";
-			} break;
-			case 4: {
-				path = "kate";
-				flags = "--line {line} --column {col} {file}";
-			} break;
-			case 5: {
-				path = "subl";
-				flags = "--project {project} {file}:{line}:{col}";
-			} break;
-			case 6: {
-				path = "vim";
-				flags = "\"+call cursor({line}, {col})\" {file}";
-			} break;
-			case 7: {
-				path = "code";
-				flags = "{project} --goto {file}:{line}:{col}";
-			} break;
-		}
-
-		// If available, always use the exec_path set by the user to allow using presets with a custom path
-		String user_exec_path = EditorSettings::get_singleton()->get("text_editor/external/exec_path");
-		if (!user_exec_path.empty()) {
-			path = user_exec_path;
-		}
+		String path = EditorSettings::get_singleton()->get("text_editor/external/exec_path");
+		String flags = EditorSettings::get_singleton()->get("text_editor/external/exec_flags");
 
 		List<String> args;
 		bool has_file_flag = false;
@@ -2455,6 +2414,72 @@ void ScriptEditor::_editor_settings_changed() {
 	_update_script_names();
 
 	ScriptServer::set_reload_scripts_on_save(EDITOR_DEF("text_editor/files/auto_reload_and_parse_scripts_on_save", true));
+
+	_update_external_editor_preset();
+}
+
+void ScriptEditor::_update_external_editor_preset() {
+	int new_external_editor_preset = EditorSettings::get_singleton()->get("text_editor/external/exec_preset");
+
+	if (last_external_editor_preset != new_external_editor_preset) {
+		if (new_external_editor_preset != 0) {
+			// The preset has changed to something other than Custom: use the values for that preset
+			String preset_path;
+			String preset_flags;
+			_get_external_editor_preset(new_external_editor_preset, preset_path, preset_flags);
+
+			EditorSettings::get_singleton()->set("text_editor/external/exec_path", preset_path);
+			EditorSettings::get_singleton()->set("text_editor/external/exec_flags", preset_flags);
+		}
+	} else if (new_external_editor_preset != 0) {
+		// The settings have been updated and we're using a preset. If the user changed the exec path or flags, switch back to Custom.
+		String preset_path;
+		String preset_flags;
+		_get_external_editor_preset(new_external_editor_preset, preset_path, preset_flags);
+
+		String current_path = EditorSettings::get_singleton()->get("text_editor/external/exec_path");
+		String current_flags = EditorSettings::get_singleton()->get("text_editor/external/exec_flags");
+
+		if (preset_path != current_path || preset_flags != current_flags) {
+			EditorSettings::get_singleton()->set("text_editor/external/exec_preset", 0);
+			new_external_editor_preset = 0;
+		}
+	}
+
+	last_external_editor_preset = new_external_editor_preset;
+}
+
+void ScriptEditor::_get_external_editor_preset(const int p_preset, String &r_path, String &r_flags) {
+	switch (p_preset) {
+		case 1: {
+			r_path = "atom";
+			r_flags = "{file}:{line}:{col}";
+		} break;
+		case 2: {
+			r_path = "geany";
+			r_flags = "{file} --line {line} --column {col}";
+		} break;
+		case 3: {
+			r_path = "rider";
+			r_flags = "--line {line} --column {col} {file}";
+		} break;
+		case 4: {
+			r_path = "kate";
+			r_flags = "--line {line} --column {col} {file}";
+		} break;
+		case 5: {
+			r_path = "subl";
+			r_flags = "--project {project} {file}:{line}:{col}";
+		} break;
+		case 6: {
+			r_path = "vim";
+			r_flags = "\"+call cursor({line}, {col})\" {file}";
+		} break;
+		case 7: {
+			r_path = "code";
+			r_flags = "{project} --goto {file}:{line}:{col}";
+		} break;
+	}
 }
 
 void ScriptEditor::_filesystem_changed() {
@@ -3532,6 +3557,8 @@ ScriptEditor::ScriptEditor(EditorNode *p_editor) {
 
 	add_theme_style_override("panel", editor->get_gui_base()->get_theme_stylebox("ScriptEditorPanel", "EditorStyles"));
 	tab_container->add_theme_style_override("panel", editor->get_gui_base()->get_theme_stylebox("ScriptEditor", "EditorStyles"));
+
+	last_external_editor_preset = EditorSettings::get_singleton()->get("text_editor/external/exec_preset");
 }
 
 ScriptEditor::~ScriptEditor() {
